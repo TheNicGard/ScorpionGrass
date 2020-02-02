@@ -1,4 +1,7 @@
+#!/usr/bin/python
+
 import AO3
+import math
 import os
 import pickle
 import random
@@ -8,8 +11,6 @@ import urllib.parse
 import wget
 from PySide2 import QtCore, QtWidgets, QtGui
 from urllib.parse import quote
-
-debug = True
 
 def message(string):
     if textbox is not None:
@@ -40,8 +41,7 @@ def saveSessionToCache(session, sessionFile):
     if session is not None:
         with open(sessionFile, "wb") as f:
             pickle.dump(session, f)
-            if debug:
-                message("[DEBUG] Updated session cache-file %s." % sessionFile)
+            message("Updated session cache-file %s." % sessionFile)
         f.close()
                 
 def loadSessionFromCache(sessionFile):
@@ -49,8 +49,7 @@ def loadSessionFromCache(sessionFile):
     if os.path.getsize(sessionFile) > 0:
         with open(sessionFile, "rb") as f:
             session = pickle.load(f)
-            if debug:
-                message("[DEBUG] Loaded session cache-file %s." % sessionFile)
+            message("Loaded session cache-file %s." % sessionFile)
         f.close()
     return session
     
@@ -70,6 +69,8 @@ class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         super().setWindowTitle("ScorpionGrass")
+        super().setWindowIcon(QtGui.QIcon("icon.png"))
+
 
         self.setLayout(QtWidgets.QVBoxLayout())
         
@@ -120,7 +121,9 @@ class MyWidget(QtWidgets.QWidget):
         self.start()
 
     def start(self):
-        self.session = loadSessionFromCache("session.pickle")
+        self.session = None
+        if os.path.isfile("session.pickle"):
+            self.session = loadSessionFromCache("session.pickle")
         self.setLoggedInState(self.session is not None)
 
     def login_button_action(self):
@@ -135,11 +138,10 @@ class MyWidget(QtWidgets.QWidget):
                     self.session = get_session(self.username_box.text(), self.password_box.text())
                     saveSessionToCache(self.session, "session.pickle")
                     message("Get session for " + self.username_box.text() + "!")
-                    message(self.session.username + " has " + str(self.session.get_n_bookmarks()) + " bookmarks.")
                     self.setLoggedInState(True)
                     break
                 except AO3.utils.LoginError:
-                    message("Error logging in!")
+                    message("[ERROR] Something failed while logging in!")
                     self.password_box.setText("")
                     return
 
@@ -147,21 +149,33 @@ class MyWidget(QtWidgets.QWidget):
         do_download(self.session, self.bookmark_amount.value(), self.test_run.isChecked())
 
     def logout_button_action(self):
-        message("[DEBUG] Attempted logging out!")
         self.setLoggedInState(False)
+        if os.path.isfile("session.pickle"):
+            os.remove("session.pickle")
 
     def setLoggedInState(self, state):
         if state:
             self.login_form.setEnabled(False)
             self.download_form.setEnabled(True)
+            message(self.session.username + " has " + str(self.session.get_n_bookmarks()) + " bookmarks (note: the API currently does not read the number of bookmarks correctly).")
         else:
             self.login_form.setEnabled(True)
             self.download_form.setEnabled(False)
             
 def do_download(session, number_to_download, test_run):
-    bookmarks = session.get_bookmarks(page=1)
-    for i in range(number_to_download):
-        download_work(bookmarks[i], test_run)
+    # total_number_of_bookmarks = session.get_n_bookmarks()
+    page_num = (number_to_download + 19) // 20
+
+    for i in range(page_num):
+        bookmarks = session.get_bookmarks(page=i + 1)
+
+        if i + 1 < page_num or (i + 1 == page_num and number_to_download % 20 == 0):
+            for k in range(20):
+                download_work(bookmarks[k], test_run)
+        else:
+            for k in range(number_to_download % 20):
+                download_work(bookmarks[k], test_run)
+
     message("Done downloading!")
 
 if __name__ == "__main__":
