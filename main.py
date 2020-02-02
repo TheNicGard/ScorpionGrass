@@ -65,6 +65,7 @@ class LogPane(QtWidgets.QTextEdit):
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        super().setWindowTitle("ScorpionGrass")
 
         self.setLayout(QtWidgets.QVBoxLayout())
         
