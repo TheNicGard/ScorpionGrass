@@ -2,6 +2,7 @@ import AO3
 import os
 import pickle
 import random
+import re
 import sys
 import urllib.parse
 import wget
@@ -12,18 +13,21 @@ debug = True
 
 def message(string):
     if textbox is not None:
-        textbox.appendMessage(string)
+        textbox.appendMessage(string + "\n")
 
 def download_work(work, test_run):
     work_id = work[0]
     title = work[1]
     
     try:
-        download_url = "https://archiveofourown.org/downloads/" + str(work_id) + "/" + quote(title) + ".pdf"
-        textbox.appendMessage("Downloading \"" + title + "\" (" + str(work_id) + ") from " + download_url)
+        # apparently ao3 doesn't care what the file is called when requested?
+        download_url = "https://archiveofourown.org/downloads/" + str(work_id) + "/bookmark.pdf" 
+        message("Downloading \"" + title + "\" (" + str(work_id) + ") from:\n" + download_url)
         if not test_run:
             if not os.path.exists("works"):
                 os.makedirs("works")
+            # not sanitizing titles before saving them causes some downloads to fail
+            title = re.sub('[' + re.escape(''.join(['?', '/', '\\', '<', '>', ':', '|', '*', '"'])) + ']', '', title)
             wget.download(download_url, os.path.join("works", title + ".pdf"))
     except Exception as e:
         message("[ERROR] Something bad happened while downloading!")
@@ -140,7 +144,6 @@ class MyWidget(QtWidgets.QWidget):
                     return
 
     def download_button_action(self):
-        message("[DEBUG] Attempted downloading!")
         do_download(self.session, self.bookmark_amount.value(), self.test_run.isChecked())
 
     def logout_button_action(self):
